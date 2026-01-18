@@ -44,7 +44,7 @@ A modern, secure email service API built with Node.js, Express, PostgreSQL, and 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/airmailer.git
+   git clone https://github.com/PrAtHaM-0707/AirMailer.git
    cd airmailer
    ```
 
@@ -183,4 +183,4 @@ If you have any questions or need help, please open an issue on GitHub.
 
 ---
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by Pratham

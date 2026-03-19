@@ -1,5 +1,7 @@
 import { decodeJWT, refreshToken } from './auth';
 
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response | void> {
   let token = localStorage.getItem('token');
   if (!token) {
@@ -24,8 +26,10 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
     'Authorization': `Bearer ${token}`
   };
 
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+
   try {
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(fullUrl, { ...options, headers });
     if (response.status === 401) {
       // Token might be invalid or revoked
       window.dispatchEvent(new Event('auth-error'));

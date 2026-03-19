@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 import { authenticatedFetch } from "@/lib/api";
 
 export default function VerifyEmail() {
@@ -23,7 +24,7 @@ export default function VerifyEmail() {
 
     const verifyEmail = async () => {
       try {
-        const res = await fetch("/api/auth/verify-email", {
+        const res = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/signup";
+      const endpoint = isLogin ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth/signup`;
       const body = isLogin
         ? { email: formData.email, password: formData.password }
         : { email: formData.email, password: formData.password };
@@ -101,7 +102,7 @@ export default function Auth() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/forgot-password", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),

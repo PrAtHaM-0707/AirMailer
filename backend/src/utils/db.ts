@@ -26,7 +26,9 @@ export function getPool(): Pool {
     });
 
     pool.on('error', (err) => {
-      console.error('Unexpected error on idle client', err);
+      // Neon DB aggressively closes idle connections. 
+      // We just log it as a warning instead of a massive stack trace.
+      console.warn(`[DB WARNING] Idle client disconnected: ${err.message}`);
     });
   }
   return pool;

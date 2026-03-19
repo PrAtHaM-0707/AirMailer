@@ -3,7 +3,6 @@ import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
 import { getPool } from '../utils/db';
-import { hashApiKey } from '../utils/hash';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -78,8 +77,7 @@ router.post('/regenerate', async (req: Request, res: Response) => {
     }
     await pool.query('DELETE FROM api_keys WHERE user_id = $1', [userId]);
     const newApiKey = `am_${uuidv4()}`;
-    const hashedKey = hashApiKey(newApiKey);
-    await pool.query('INSERT INTO api_keys (user_id, api_key) VALUES ($1, $2)', [userId, hashedKey]);
+    await pool.query('INSERT INTO api_keys (user_id, api_key) VALUES ($1, $2)', [userId, newApiKey]);
     res.status(200).json({ success: true, message: 'API key regenerated successfully!', newApiKey });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.stack || err.message : 'Unknown error';

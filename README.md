@@ -9,9 +9,11 @@ A modern, secure email service API built with Node.js, Express, PostgreSQL, and 
 - **Password Reset** - Secure password reset functionality
 - **API Key Management** - Generate and manage API keys for email sending
 - **Rate Limiting** - 10 emails per day per user
+- **Security First** - Zod payload validations, Helmet headers, CORS tracking
+- **Robust Architecture** - PostgreSQL Transactions and structured JSON Winston Logging
 - **Email Logging** - Track all sent emails with delivery status
-- **Modern UI** - Beautiful React dashboard with dark/light themes
-- **Security First** - Input sanitization, CORS, security headers
+- **Modern UI** - Beautiful React dashboard with Context API state management
+- **Health Checks** - Built-in APIs to verify pipeline statuses
 
 ## 🛠️ Tech Stack
 
@@ -37,8 +39,8 @@ A modern, secure email service API built with Node.js, Express, PostgreSQL, and 
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL 13+
-- Gmail account (for email sending)
+- PostgreSQL (Neon DB recommended)
+- Gmail account with verified App Password
 
 ### Installation
 
@@ -66,8 +68,9 @@ A modern, secure email service API built with Node.js, Express, PostgreSQL, and 
    ```
 
 4. **Access the application**
-   - Frontend: http://localhost:8080
+   - Frontend: http://localhost:5173
    - Backend API: http://localhost:3000
+   - Health Check: http://localhost:3000/api/health
 
 ## 📧 API Usage
 

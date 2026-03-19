@@ -5,7 +5,6 @@ import * as nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid';
 import { getPool } from '../utils/db';
 import { z } from 'zod';
-import { hashApiKey } from '../utils/hash';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -149,8 +148,7 @@ router.post('/signup', async (req: Request, res: Response) => {
       userId = userResult.rows[0].id;
 
       apiKey = `am_${uuidv4()}`;
-      const hashedApiKey = hashApiKey(apiKey);
-      await client.query('INSERT INTO api_keys (user_id, api_key) VALUES ($1, $2)', [userId, hashedApiKey]);
+      await client.query('INSERT INTO api_keys (user_id, api_key) VALUES ($1, $2)', [userId, apiKey]);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');

@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import nodemailer from 'nodemailer';
 import { getPool } from '../utils/db';
 import { z } from 'zod';
-import { hashApiKey } from '../utils/hash';
 import { logger } from '../utils/logger';
 import rateLimit from 'express-rate-limit';
 
@@ -32,7 +31,6 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: 'API key required in Authorization header' });
     }
     const apiKey = authHeader.split(' ')[1];
-    const hashedApiKey = hashApiKey(apiKey);
     
     const parseResult = sendEmailSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -50,7 +48,7 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
         .replace(/javascript:/gi, '');
     }
     const pool = getPool();
-    const keyResult = await pool.query('SELECT user_id FROM api_keys WHERE api_key = $1', [hashedApiKey]);
+    const keyResult = await pool.query('SELECT user_id FROM api_keys WHERE api_key = $1', [apiKey]);
     if (keyResult.rowCount === 0) {
       return res.status(401).json({ success: false, message: 'Invalid API key' });
     }

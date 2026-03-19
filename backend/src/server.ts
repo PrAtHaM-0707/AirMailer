@@ -48,6 +48,11 @@ app.use('/api/keys', keysRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api', testDbRoutes);
 
+// Health Check Endpoint
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ success: true, message: 'API is healthy and running', timestamp: new Date().toISOString() });
+});
+
 app.use((req: Request, res: Response) => {
   res.status(404).json({ success: false, message: 'Not found' });
 });

@@ -26,8 +26,12 @@ const signupSchema = z.object({
 
 // Email transporter
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // use SSL
   auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+  logger: true,
+  debug: true,
 });
 
 // Send verification email
@@ -158,12 +162,17 @@ router.post('/signup', async (req: Request, res: Response) => {
     }
 
     // Send verification email
-    await sendVerificationEmail(email, verificationToken);
+    try {
+      await sendVerificationEmail(email, verificationToken);
+    } catch (emailErr) {
+      const emailErrorMessage = emailErr instanceof Error ? emailErr.stack || emailErr.message : 'Unknown email error';
+      logger.error('[SIGNUP EMAIL ERROR] Failed to send verification email', { error: emailErrorMessage, email });
+    }
 
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
     res.status(201).json({
       success: true,
-      message: 'Account created successfully! Please check your email to verify your account.',
+      message: 'Account created successfully! We attempted to send a verification email.',
       token,
       apiKey,
       emailVerified: false
@@ -297,13 +306,18 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
       [verificationToken, verificationExpires, now, userId]
     );
 
-    await sendVerificationEmail(user.email, verificationToken);
-
-    res.status(200).json({ success: true, message: 'Verification email sent!' });
+    try {
+      await sendVerificationEmail(user.email, verificationToken);
+      res.status(200).json({ success: true, message: 'Verification email sent!' });
+    } catch (emailErr) {
+      const emailErrorMessage = emailErr instanceof Error ? emailErr.stack || emailErr.message : 'Unknown email error';
+      logger.error('[RESEND-VERIFICATION EMAIL ERROR] Failed to send email', { error: emailErrorMessage, email: user.email });
+      res.status(500).json({ success: false, message: 'Failed to send verification email. Please try again later.' });
+    }
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[RESEND-VERIFICATION ERROR]', errorMessage);
-    res.status(500).json({ success: false, message: 'Failed to send verification email', error: errorMessage });
+    const errorMessage = err instanceof Error ? err.stack || err.message : 'Unknown error';
+    logger.error('[RESEND-VERIFICATION ERROR]', { error: errorMessage });
+    res.status(500).json({ success: false, message: 'Process failed', error: errorMessage });
   }
 });
 

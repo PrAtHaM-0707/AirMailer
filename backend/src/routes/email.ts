@@ -62,8 +62,12 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
       return res.status(429).json({ success: false, message: 'Daily limit reached' });
     }
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+      logger: true,
+      debug: true
     });
     await transporter.sendMail({ from: process.env.GMAIL_USER, to, subject, text, html: sanitizedHtml });
     await pool.query('INSERT INTO email_logs (user_id, recipient, status) VALUES ($1, $2, $3)', [userId, to, 'success']);

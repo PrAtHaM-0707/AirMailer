@@ -16,7 +16,8 @@ const app = express();
 
 app.use(helmet());
 
-// Global Rate Limiter
+app.set('trust proxy', 1);
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 100,
@@ -28,9 +29,7 @@ app.use(limiter);
 
 app.use(cors({
   origin: [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    'https://airmailer.vercel.app', // Hardcoded safely to prevent any Render CORS issues
-    'http://localhost:8080'
+    process.env.FRONTEND_URL || 'http://localhost:8080'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -52,7 +51,6 @@ app.use('/api/keys', keysRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api', testDbRoutes);
 
-// Health Check Endpoint
 app.get('/api/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'API is healthy and running', timestamp: new Date().toISOString() });
 });

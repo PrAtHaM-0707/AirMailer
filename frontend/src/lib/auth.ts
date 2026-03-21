@@ -21,7 +21,7 @@ export async function refreshToken(): Promise<boolean> {
     if (!token) return false;
 
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const API_BASE = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${API_BASE}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }

@@ -6,11 +6,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPool } from '../utils/db';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
+import { BrevoClient } from '@getbrevo/brevo';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-change-this'; // Use env!
+const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-change-this';
 
-// Schemas
 const loginSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(1, 'Password is required')
@@ -28,7 +28,7 @@ const signupSchema = z.object({
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
-  secure: true, // use SSL
+  secure: true,
   auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
   logger: true,
   debug: true,
@@ -37,20 +37,51 @@ const transporter = nodemailer.createTransport({
 // Send verification email
 async function sendVerificationEmail(email: string, token: string) {
   const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${token}`;
+  
+  const subject = 'Verify your AirMailer account';
+  const htmlContent = `
+    <h1>Welcome to AirMailer!</h1>
+    <p>Please verify your email address by clicking the link below:</p>
+    <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
+    <p>This link will expire in 24 hours.</p>
+    <p>If you didn't create an account, you can ignore this email.</p>
+  `;
+  const textContent = `Welcome to AirMailer! Please verify your email by visiting: ${verificationUrl}`;
+
+  // Check if Brevo API should be used
+  if (process.env.EMAIL_PROVIDER === 'brevo' && process.env.BREVO_API_KEY) {
+    try {
+      const client = new BrevoClient({
+        apiKey: process.env.BREVO_API_KEY
+      });
+
+      await client.transactionalEmails.sendTransacEmail({
+        sender: {
+          name: 'AirMailer',
+          email: process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || ''
+        },
+        to: [{ email }],
+        subject,
+        htmlContent,
+        textContent
+      });
+
+      logger.info('[EMAIL SENT] Verification email sent successfully via Brevo', { email });
+      return;
+    } catch (error) {
+      logger.error('[EMAIL ERROR] Brevo send failed', { email, error: String(error) });
+      throw new Error(`Brevo Authentication Email Failed: ${error}`);
+    }
+  }
 
   await transporter.sendMail({
     from: process.env.GMAIL_USER,
     to: email,
-    subject: 'Verify your AirMailer account',
-    html: `
-      <h1>Welcome to AirMailer!</h1>
-      <p>Please verify your email address by clicking the link below:</p>
-      <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
-      <p>This link will expire in 24 hours.</p>
-      <p>If you didn't create an account, you can ignore this email.</p>
-    `,
-    text: `Welcome to AirMailer! Please verify your email by visiting: ${verificationUrl}`
+    subject: subject,
+    html: htmlContent,
+    text: textContent
   });
+  logger.info('[EMAIL SENT] Verification email sent successfully via Nodemailer SMTP', { email });
 }
 
 // POST /api/auth/login
@@ -136,9 +167,8 @@ router.post('/signup', async (req: Request, res: Response) => {
     }
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = uuidv4();
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); 
 
-    // Database transaction to ensure data integrity
     const client = await pool.connect();
     let userId;
     let apiKey;
@@ -161,13 +191,10 @@ router.post('/signup', async (req: Request, res: Response) => {
       client.release();
     }
 
-    // Send verification email
-    try {
-      await sendVerificationEmail(email, verificationToken);
-    } catch (emailErr) {
+    sendVerificationEmail(email, verificationToken).catch((emailErr) => {
       const emailErrorMessage = emailErr instanceof Error ? emailErr.stack || emailErr.message : 'Unknown email error';
       logger.error('[SIGNUP EMAIL ERROR] Failed to send verification email', { error: emailErrorMessage, email });
-    }
+    });
 
     const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
     res.status(201).json({
@@ -306,14 +333,14 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
       [verificationToken, verificationExpires, now, userId]
     );
 
-    try {
-      await sendVerificationEmail(user.email, verificationToken);
-      res.status(200).json({ success: true, message: 'Verification email sent!' });
-    } catch (emailErr) {
+    // Send verification email in the background (no await)
+    sendVerificationEmail(user.email, verificationToken).catch(emailErr => {
       const emailErrorMessage = emailErr instanceof Error ? emailErr.stack || emailErr.message : 'Unknown email error';
       logger.error('[RESEND-VERIFICATION EMAIL ERROR] Failed to send email', { error: emailErrorMessage, email: user.email });
-      res.status(500).json({ success: false, message: 'Failed to send verification email. Please try again later.' });
-    }
+    });
+    
+    // We respond immediately to the user
+    res.status(200).json({ success: true, message: 'Verification email sent!' });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.stack || err.message : 'Unknown error';
     logger.error('[RESEND-VERIFICATION ERROR]', { error: errorMessage });

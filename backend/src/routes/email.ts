@@ -4,6 +4,7 @@ import { getPool } from '../utils/db';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import rateLimit from 'express-rate-limit';
+import { BrevoClient } from '@getbrevo/brevo'; // ✅ FIXED IMPORT
 
 const router = Router();
 
@@ -37,7 +38,6 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: parseResult.error.issues[0].message });
     }
     
-    // Explicitly handle html and text fallback to handle the TS undefined checking correctly later
     const { to, subject, text, html } = parseResult.data;
 
     let sanitizedHtml = html;
@@ -47,31 +47,72 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
         .replace(/on\w+="[^"]*"/gi, '')
         .replace(/javascript:/gi, '');
     }
+
     const pool = getPool();
     const keyResult = await pool.query('SELECT user_id FROM api_keys WHERE api_key = $1', [apiKey]);
     if (keyResult.rowCount === 0) {
       return res.status(401).json({ success: false, message: 'Invalid API key' });
     }
+
     const userId = keyResult.rows[0].user_id;
+
     const todayResult = await pool.query(
       `SELECT COUNT(*) AS count FROM email_logs WHERE user_id = $1 AND sent_at >= CURRENT_DATE AND status = 'success'`,
       [userId]
     );
+
     const sentToday = parseInt(todayResult.rows[0].count, 10);
     if (sentToday >= 10) {
       return res.status(429).json({ success: false, message: 'Daily limit reached' });
     }
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-      logger: true,
-      debug: true
-    });
-    await transporter.sendMail({ from: process.env.GMAIL_USER, to, subject, text, html: sanitizedHtml });
-    await pool.query('INSERT INTO email_logs (user_id, recipient, status) VALUES ($1, $2, $3)', [userId, to, 'success']);
+
+    // ✅ FIXED BREVO IMPLEMENTATION
+    if (process.env.EMAIL_PROVIDER === 'brevo' && process.env.BREVO_API_KEY) {
+      const client = new BrevoClient({
+        apiKey: process.env.BREVO_API_KEY
+      });
+
+      await client.transactionalEmails.sendTransacEmail({
+        sender: {
+          name: 'AirMailer API',
+          email: process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || ''
+        },
+        to: [{ email: to }],
+        subject: subject,
+        htmlContent: sanitizedHtml,
+        textContent: text
+      });
+
+      logger.info('[EMAIL SENT] API email sent successfully via Brevo API', { to, userId });
+
+    } else {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+        logger: true,
+        debug: true
+      });
+
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to,
+        subject,
+        text,
+        html: sanitizedHtml
+      });
+
+      logger.info('[EMAIL SENT] API email sent successfully via Nodemailer SMTP', { to, userId });
+    }
+
+    await pool.query(
+      'INSERT INTO email_logs (user_id, recipient, status) VALUES ($1, $2, $3)',
+      [userId, to, 'success']
+    );
+
     res.status(200).json({ success: true, message: 'Email sent' });
+
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.stack || err.message : 'Unknown error';
     logger.error('[SEND ERROR]', { error: errorMessage });

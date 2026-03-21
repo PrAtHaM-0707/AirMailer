@@ -51,6 +51,7 @@ async function sendVerificationEmail(email: string, token: string) {
   // Check if Brevo API should be used
   if (process.env.EMAIL_PROVIDER === 'brevo' && process.env.BREVO_API_KEY) {
     try {
+      logger.info(`[AUTH EMAIL IN PROGRESS] Sending verification email via Brevo`, { email });
       const client = new BrevoClient({
         apiKey: process.env.BREVO_API_KEY
       });
@@ -66,14 +67,15 @@ async function sendVerificationEmail(email: string, token: string) {
         textContent
       });
 
-      logger.info('[EMAIL SENT] Verification email sent successfully via Brevo', { email });
+      logger.info('[AUTH EMAIL SENT] Verification email sent successfully via Brevo', { email, timestamp: new Date().toISOString() });
       return;
     } catch (error) {
-      logger.error('[EMAIL ERROR] Brevo send failed', { email, error: String(error) });
+      logger.error('[AUTH EMAIL ERROR] Brevo send failed', { email, error: String(error) });
       throw new Error(`Brevo Authentication Email Failed: ${error}`);
     }
   }
 
+  logger.info(`[AUTH EMAIL IN PROGRESS] Sending verification email via Nodemailer`, { email });
   await transporter.sendMail({
     from: process.env.GMAIL_USER,
     to: email,
@@ -191,12 +193,15 @@ router.post('/signup', async (req: Request, res: Response) => {
       client.release();
     }
 
+    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
+    
+    logger.info('[SIGNUP IN PROGRESS] User signed up, attempting to send verification email', { email, userId });
+    
     sendVerificationEmail(email, verificationToken).catch((emailErr) => {
       const emailErrorMessage = emailErr instanceof Error ? emailErr.stack || emailErr.message : 'Unknown email error';
-      logger.error('[SIGNUP EMAIL ERROR] Failed to send verification email', { error: emailErrorMessage, email });
+      logger.error('[SIGNUP EMAIL ERROR] Failed to send verification email during signup', { error: emailErrorMessage, email, userId });
     });
 
-    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' });
     res.status(201).json({
       success: true,
       message: 'Account created successfully! We attempted to send a verification email.',
@@ -333,10 +338,12 @@ router.post('/resend-verification', async (req: Request, res: Response) => {
       [verificationToken, verificationExpires, now, userId]
     );
 
+    logger.info('[RESEND VERIFICATION] Request received, attempting to send email', { email: user.email, userId });
+
     // Send verification email in the background (no await)
     sendVerificationEmail(user.email, verificationToken).catch(emailErr => {
       const emailErrorMessage = emailErr instanceof Error ? emailErr.stack || emailErr.message : 'Unknown email error';
-      logger.error('[RESEND-VERIFICATION EMAIL ERROR] Failed to send email', { error: emailErrorMessage, email: user.email });
+      logger.error('[RESEND-VERIFICATION EMAIL ERROR] Failed to send email during resend', { error: emailErrorMessage, email: user.email, userId });
     });
     
     // We respond immediately to the user

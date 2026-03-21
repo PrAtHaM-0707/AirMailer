@@ -68,6 +68,7 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
 
     // ✅ FIXED BREVO IMPLEMENTATION
     if (process.env.EMAIL_PROVIDER === 'brevo' && process.env.BREVO_API_KEY) {
+      logger.info(`[SEND IN PROGRESS] Attempting to send email via Brevo API`, { fromUserId: userId, to });
       const client = new BrevoClient({
         apiKey: process.env.BREVO_API_KEY
       });
@@ -83,9 +84,10 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
         textContent: text
       });
 
-      logger.info('[EMAIL SENT] API email sent successfully via Brevo API', { to, userId });
+      logger.info('[EMAIL SENT] API email sent successfully via Brevo API', { to, subject, userId, timestamp: new Date().toISOString() });
 
     } else {
+      logger.info(`[SEND IN PROGRESS] Attempting to send email via Nodemailer`, { fromUserId: userId, to });
       const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
@@ -107,15 +109,15 @@ router.post('/send', emailLimiter, async (req: Request, res: Response) => {
     }
 
     await pool.query(
-      'INSERT INTO email_logs (user_id, recipient, status) VALUES ($1, $2, $3)',
-      [userId, to, 'success']
+      'INSERT INTO email_logs (user_id, recipient, subject, status) VALUES ($1, $2, $3, $4)',
+      [userId, to, subject, 'success']
     );
 
     res.status(200).json({ success: true, message: 'Email sent' });
 
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.stack || err.message : 'Unknown error';
-    logger.error('[SEND ERROR]', { error: errorMessage });
+    logger.error('[SEND ERROR] API email failed to send', { error: errorMessage, stack: err instanceof Error ? err.stack : undefined });
     res.status(500).json({ success: false, message: 'Send failed', error: errorMessage });
   }
 });

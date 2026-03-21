@@ -27,7 +27,7 @@ router.get('/get', async (req: Request, res: Response) => {
     }
 
     const logsResult = await pool.query(
-      `SELECT id, recipient AS to, 'Email Sent' AS subject, status, sent_at AS timestamp, 'msg_' || id AS messageId
+      `SELECT id, recipient AS to, subject, status, sent_at AS timestamp, 'msg_' || id AS messageId
        FROM email_logs
        WHERE user_id = $1
        ORDER BY sent_at DESC

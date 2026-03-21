@@ -1,6 +1,7 @@
 import { decodeJWT, refreshToken } from './auth';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// Use VITE_BACKEND_URL for production (Render), fall back to VITE_API_URL for local dev
+export const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
 
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response | void> {
   let token = localStorage.getItem('token');
